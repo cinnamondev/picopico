@@ -2,11 +2,13 @@ solution:
   compiler: GCC
   misc:
      - for-compiler: GCC
-       C:
+       C-CPP:
          - -std=gnu11
        Link:
          - --specs=nano.specs
          - --specs=rdimon.specs
+       ASM:
+         - -masm=auto
   projects:
     - project: ./picopico.cproject.yaml
   target-types:
@@ -14,7 +16,6 @@ solution:
       device: ARM::ARMCM0P
   build-types:
     - type: Debug
-      optimize: none
       debug: on
       define:
         - DEBUG

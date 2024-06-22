@@ -15,18 +15,33 @@
 #>
 
 param (
-    [string[]]
-    $link_libs = "",
     [string]
     $BuildTarget = "Debug",
     [string]
     $TargetProject = "",
+    [string[]]
+    $link_libs = "",
     [switch]
-    $target_usb,
-    [switch]
-    $NoNinja                    # Ninja seems to cause problems with the toolchain path on linux.
-
+    $target_usb
 )
+
+$_T = Get-Location
+$BUILDDIR = "${_T}/build"
+$TEMPDIR = "${_T}/build/.tmp"
+$PROJECTDIR ="${_T}/build/${Project_Name}"
+$TARGETDIR = "${_T}/build/${Project_Name}/${BuildTarget}"
+$OUTPUTDIR = "${_T}/build/${Project_Name}/${BuildTarget}/out"
+
+
+# ensure build directories exist
+if (!((Test-Path $OUTPUTDIR) -and (Test-Path $TEMPDIR))) {
+    New-Item -Path $BUILDDIR -ItemType Directory
+    New-Item -Path $TEMPDIR -ItemType Directory
+    New-Item -Path $PROJECTDIR -ItemType Directory
+    New-Item -Path $TARGETDIR -ItemType Directory
+    New-Item -Path $OUTPUTDIR -ItemType Directory
+}
+
 
 # bootstrap vcpkg & activate build environment
 Invoke-Expression (Invoke-WebRequest -useb https://aka.ms/vcpkg-init.ps1)
@@ -36,8 +51,11 @@ $VCPKG_DIR = If(${Env:VCPKG_DOWNLOADS}) {${Env:VCPKG_DOWNLOADS}} else {
     ${Env:VCPKG_ROOT} + "/downloads/"
 }
 Write-Host $VCPKG_DIR
-$GCC_TOOLCHAIN = Get-ChildItem "${VCPKG_DIR}artifacts/vcpkg-artifacts-arm/compilers.arm.arm.none.eabi.gcc" | Where-Object Name -match ".+-mpacbti" | Select-Object -First 1
+$GCC_TOOLCHAIN = Get-ChildItem "${VCPKG_DIR}artifacts/vcpkg-artifacts-arm/compilers.arm.arm.none.eabi.gcc" | Select-Object -First 1
+Write-Host "hii"
 Write-Host $GCC_TOOLCHAIN
+Write-Host "hiiii
+"
 #$GCC_TOOLCHAIN = 
 #$AC6_TOOLCHAIN = ""
 
@@ -60,6 +78,9 @@ set(CMAKE_STRIP                 `"${GCC_TOOLCHAIN}/bin/arm-none-eabi-strip${end}
 $SOLUTION = @(Get-ChildItem -Filter "*.csolution.yaml")[0] # TODO: detect many csolutions?
 if(!$SOLUTION) {$SOLUTION = @(Get-ChildItem -Filter "*.csolution.yml")[0]}
 
+Write-Host "aaaa"
+Write-Host $TargetProject
+Write-Host "aaaa"
 # All projects matching name in csolution
 $int_ttypes = $false
 $Type = "Device" # use project default as a fallback
@@ -69,6 +90,7 @@ if($TargetProject -match "((.*[\\\/])(.+).cproject.yaml)") {
 } else {
     (Get-Content $SOLUTION) | ForEach-Object {
         if ($_ -match "- project: ((.*[\\\/])(.+).cproject.yaml)") {
+            Write-Host $Matche
             if($Matches.3 -eq $TargetProject) {
                 [System.Tuple]::Create($Matches.3,$Matches.2,$Matches.1)
             }
@@ -92,22 +114,6 @@ $Project_Name = $_Projects.Item1
 $Project_Path = $_Projects.Item2
 $Project_Full_Path = $_Projects.Item3
 
-$_T = Get-Location
-$BUILDDIR = "${_T}/build"
-$TEMPDIR = "${_T}/build/.tmp"
-$PROJECTDIR ="${_T}/build/${Project_Name}"
-$TARGETDIR = "${_T}/build/${Project_Name}/${BuildTarget}"
-$OUTPUTDIR = "${_T}/build/${Project_Name}/${BuildTarget}/out"
-
-
-# ensure build directories exist
-if (!((Test-Path $OUTPUTDIR) -and (Test-Path $TEMPDIR))) {
-    New-Item -Path $BUILDDIR -ItemType Directory
-    New-Item -Path $TEMPDIR -ItemType Directory
-    New-Item -Path $PROJECTDIR -ItemType Directory
-    New-Item -Path $TARGETDIR -ItemType Directory
-    New-Item -Path $OUTPUTDIR -ItemType Directory
-}
 
 
 # Get missing packages
@@ -136,7 +142,7 @@ include(${_T}/pico_sdk_import.cmake)".Replace('\','/')
         }
         if ($_ -match 'project\(.+\)') {
             # Load SDK after project (+ additional languages for SDK)
-            Write-Output "project(`${TARGET} CXX ASM)
+            Write-Output "project(`${TARGET} C CXX ASM)
 pico_sdk_init()"
         }
     } | Set-Content "CMakeLists.txt"
@@ -153,8 +159,6 @@ target_link_libraries(`${TARGET} pico_stdlib ${link_libs})
 pico_add_extra_outputs(`${TARGET})
 ".Replace('\','/')
 Add-Content "CMakeLists.txt" $append 
-
-$GeneratorArg = if ($NoNinja) {""} else {"-GNinja"}
-cmake $GeneratorArg -B . -DCMAKE_TOOLCHAIN_FILE=../../../.tmp/target_rp2040_asm.cmake
-if(!$NoNinja) {ninja}
+cmake -GNinja -B . -DCMAKE_TOOLCHAIN_FILE="${TEMPDIR}/target_rp2040_asm.cmake"
+ninja
 Set-Location $_T

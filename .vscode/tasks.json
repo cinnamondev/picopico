@@ -1,24 +1,30 @@
 {
     "version": "2.0.0",
+    "options": {
+        "shell": {
+          "executable": "/usr/bin/pwsh",
+          "args": ["-CommandWithArgs"],
+        }
+      },
     "tasks": [
         {
             "type": "shell",
-            "command": "powershell",
+            "command": "./buildgen.ps1",
             "label": "Buildgen-Debug-Build",
             "args": [
-                "./buildgen.ps1",
-                "-BuildTarget ${command:cmsis-csolution.getBuildType}",
-                "-TargetProject picopico",
-                "-link_libs cmsis_core,hardware_spi,hardware_dma,hardware_irq" // user insert here :)
+                "Debug",
+                "picopico",
+                "cmsis_core,hardware_spi,hardware_dma,hardware_irq" // user insert here :)
             ],
             "group": {
                 "kind": "build",
                 "isDefault": true
             }
+
         },
         {
             "type": "shell",
-            "command": "powershell",
+            "command": "pwsh",
             "label": "Buildgen-Bootstrapper",
             "args": [
                 "./bootstrap.ps1",
