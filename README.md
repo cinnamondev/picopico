@@ -1,100 +1,50 @@
-# cmsis-rp2040 (picopico)
+# picopico
 
-Project template to facilitate CMSIS and the Pico-SDK relatively seamlessly.
+## Bootstrap
 
-[buildgen.ps1](buildgen.ps1) facilitates this. Using the Open-CMSIS devtools in
-conjunction with a custom script, we can generate cmake files that include the
-pico-sdk, along with anything else included by the CMSIS system.
+Requiries Powershell on *all* operating systems. `bootstrap.ps1` is used to maintain
+the build environment. It will search for pico-sdk in the current, then parent directories.
+If an installation is not already present, and the previous is true, it will prompt to clone a new copy.
 
-## Dependencies
+Bootstrap will also invoke vcpkg and activate the build environment. It is handy as a pre-build step, as
+you will not need to install any other packages.
 
-Base:
+You can use this template without the bootstrap script. You will requirie the following:
+- arm-none-eabi-gcc (pico-sdk only supports gcc! no AC6)
+- cmake
+- ninja
+- openocd
 
-- powershell (5.10+): Powershell included with Windows should work fine here.
-- internet access: build tools (arm gcc, cmake, ninja, ctools, openocd, etc...)
-are pulled via [vcpkg](https://github.com/microsoft/vcpkg) artifacts. This should
-remove the guess-work in downloading the right build tools.
+### Structuring your projects
 
-Additional:
+Personally, I reccomend placing your pico-sdk install in the parent directory of
+your project. Try to avoid cluttering your system with many sdk installs, if you
+have cleaned up your installs, use option `-ResetSDKLocation` and it will remove
+the environment variable. 
 
-- clang tools (ie `clang-format`). [.clang-format](.clang-format) is your base for
-this. `clangd` also comes in handy. These can be downloaded as part of `llvm`,
-which can be downloaded using the [choco](https://chocolatey.org/) package manager,
-though it could be obtained a variety of ways.
-- (vscode): cortex-debug and ARM CMSIS csolution extension.
+You could also choose to place it in your home directory. It is important to set
+the environment variable PICO_SDK_PATH. This can always be set by yourself, though
+usng the option `-PICO_SDK_PATH <path>` via `bootstrap.ps1` will also do this.
 
-Build tools can be accessed without executing the build script itself using
-[bootstrap.ps1](./bootstrap.ps1)- which only activates the vcpkg environment.
+## Integration
 
-Alternatively:
+### Vscode
 
-- Quick bootstrap (powershell)
+Reccomended extensions:
 
-    ```ps1
-    iex (iwr -useb https://aka.ms/vcpkg-init.ps1)
-    vcpkg activate
-    ```
+Example tasks.json:
+```
 
-- Via repo
+```
 
-    ```bash
-    git clone https://github.com/Microsoft/vcpkg.git
-    # ./vcpkg/bootstrap-vcpkg.bat # Windows
-    ./vcpkg/bootstrap-vcpkg.sh # Shell script
-    ```
+## Debugging / picoprobe
 
-### Visual Studio Code
+The Pi Foundation have their own firmware for the Pico, called 
+[debugprobe](https://github.com/raspberrypi/debugprobe), which can
+turn a Pi Pico into a CMSIS-DAP debug probe with additional UART bridge.
 
-In [.vscode](./.vscode/), some suitable defaults are provided. This means
-build tasks which can be used without other additional dependencies- as your
-project(s) in this template evolve, however, you may need to adjust these tasks,
-as they dictate what the pico-sdk includes in the build.
-
-The other build tasks, namely `picopico program`, `BUILDGEN & PROGRAM`, and the
-`cortex-debug` launch tasks are intended to target a CMSIS-DAP debug probe for
-programming. See section "picoprobe" for some information on this.
-<!--
-(TODO) As a convenience, a vscode extension pack is provided - which installs the
-following extensions:
-
-- ARM CMSIS csolutions
-- clangd format
-- cmake support
-- TODO finish pack!!
-
--->
-
-## Built-in demos
-
-There are currently 2 demos available.
-
-- [Blinking light demo (master)](https://github.com/cinnamondev/cmsis-rp2040) - Blink the on board LED.
-
-- [LVGL demo (demo-lvgl)](https://github.com/cinnamondev/cmsis-rp2040/tree/demo-lvgl) - Using the CMSIS ecosystem, LVGL and perf_counter
-can be used for a relatively seamless port of LVGL. This demo branch includes
-drivers for the ILI9341 and XPT2040.
-
-## Linux
-
-Powershell is crossplatform - and as long as you can install it, the buildscript
-itself should work. `vcpkg`, too, is crossplatform.
-
-So far, I have ran into trouble getting everything set up perfectly.
-`vcpkg` succeeds but ninja attempts to use tools from the wrong toolchain at
-times, rather than using the just installed `arm-none-eabi-gcc` toolchain.
-Hoping to work this out in time- this will remain TODO.
-
-## picoprobe
-
-There are many ways to debug the Pico. The 'standard' is via a CMSIS-DAP probe,
-such as a J-Link. However, the Pi Foundation have their own firmware for the
-Pico, called [picoprobe](https://github.com/raspberrypi/picoprobe), which can
-turn a Pi Pico into a CMSIS-DAP debug probe with additional UART bridge. No more
-BOOTSEL fiddling! This is possible using OpenOCD (included via vcpkg)- the Pi
-Foundations build is no longer a neccesity these days.
-
-Simply flash their firmware to a spare pico you have lying about, and you now
-have a debug probe!
+There are alternative debug probes you can use instead too, any CMSIS-DAP probe
+can be used without additional confiiguration. Past this, you're on your own :).
 
 ![Getting Started with Raspberry Pi Pico - page 64. Wiring Diagram](./.assets/picoprobe_wiring.png)
 
@@ -104,13 +54,12 @@ The documentation of the RP2040 microcontroller is licensed under a [Creative Co
 Alternatively, the Pi Foundation also [make their own debug probe](https://www.raspberrypi.com/products/debug-probe/), which should function through the same means, but using
 their standardised [Debug connector spec](https://datasheets.raspberrypi.com/debug/debug-connector-specification.pdf).
 
-## Licensing
+# Licensing
 
-This template (i.e: the buildgen build script) is licensed under the [Apache 2.0
-License](./LICENSE).
+[Apache 2.0 License](./LICENSE).
 
 ```text
-   Copyright 2023 Cinnamondev
+   Copyright 2024 Cinnamondev
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -124,10 +73,3 @@ License](./LICENSE).
    See the License for the specific language governing permissions and
    limitations under the License.
 ```
-
-## In the future
-
-- Arm Compiler configuration
-- Linux fix
-- .clangd
-- vscode extension pack

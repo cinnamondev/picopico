@@ -1,16 +1,18 @@
 {
     "version": "2.0.0",
-    "options": {
-        "shell": {
-          "executable": "/usr/bin/pwsh",
-          "args": ["-CommandWithArgs"],
+    "linux": {
+        "options": {
+            "shell": {
+                "executable": "/usr/bin/pwsh",
+                "args": ["-CommandWithArgs"],
+            }
         }
-      },
+    },
     "tasks": [
         {
             "type": "shell",
             "command": "./buildgen.ps1",
-            "label": "Buildgen-Debug-Build",
+            "label": "Build (debug)",
             "args": [
                 "Debug",
                 "picopico",
@@ -24,11 +26,23 @@
         },
         {
             "type": "shell",
-            "command": "pwsh",
-            "label": "Buildgen-Bootstrapper",
+            "command": "./buildgen.ps1",
+            "label": "Build (debug)",
             "args": [
-                "./bootstrap.ps1",
-            ]
+                "Debug",
+                "picopico",
+                "cmsis_core,hardware_spi,hardware_dma,hardware_irq" // user insert here :)
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+
+        },
+        {
+            "type": "shell",
+            "command": "./bootstrap.ps1",
+            "label": "bootstrap"
         },
         {
             "type": "shell",
@@ -39,13 +53,13 @@
         },
         {
             "type": "shell",
-            "dependsOn": ["Buildgen-Bootstrapper"],
-            "command": "openocd -f interface/cmsis-dap.cfg -f target/rp2040.cfg -f ./openocd.cfg -c “program ./build/picopico/Debug/out/picopico.elf verify reset exit”",
+            "dependsOn": ["bootstrap"],
+            "command": "openocd -f ./openocd.cfg -c “program ./build/picopico/Debug/out/picopico.elf verify reset exit”",
             "label": "picopico program",
         },
         {
             "type": "shell",
-            "dependsOn": ["Buildgen-Bootstrapper"],
+            "dependsOn": ["bootstrap"],
             "command": "openocd -f interface/cmsis-dap.cfg -f target/rp2040.cfg -f ./openocd.cfg -c “init ; reset halt ; rp2040.core1 arp_reset assert 0 ; rp2040.core0 arp_reset assert 0 ; exit”",
             "label": "picopico reset",
         }
