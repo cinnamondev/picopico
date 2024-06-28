@@ -1,16 +1,14 @@
 project:
   packs:
-    - pack: ARM::CMSIS@5.9.0
-  setups:
-    - setup: picopico lvgl demo setup
-      define:
-        - LV_CONF_INCLUDE_SIMPLE
-
+    - pack: ARM::CMSIS@>=6.1.0
+    - pack: RaspberryPi::RP2xxx_DFP@>=0.9.5
   components:
-    - component: CMSIS:CORE
+    - component: RaspberryPi::Device:Pico SDK
+    - component: RaspberryPi::Device:Startup&C Startup
+    - component: RaspberryPi::Device:Pico Board&Pico
+    - component: ARM::CMSIS:CORE
+    
   groups:
     - group: Source
       files:
         - file: ./src/main.c
-        - file: ./src/ili9341.c
-

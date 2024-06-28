@@ -32,6 +32,9 @@
 *.app
 
 RTE/
-build/
+out/
+tmp/
+*.cprj
+*.yml
 .clangd
-.vscode/settings.json
+.vscode
