@@ -18,5 +18,11 @@
   "C_Cpp_Runner.showCompilationTime": false,
   "git.detectSubmodules": false,
   "editor.tabSize": 2,
+  "cmake.environment": {
+    "PICO_SDK_PATH": "../../../pico-sdk"
+  },
+  "files.associations": {
+    "perf_counter.h": "c"
+  },
 
 }

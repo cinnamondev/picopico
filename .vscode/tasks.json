@@ -48,20 +48,20 @@
             "type": "shell",
             "dependsOn": ["Buildgen-Debug-Build", "picopico program"],
             "dependsOrder":"sequence",
-            "label": "BUILDGEN & PROGRAM",
+            "label": "Build&Program (Debug)",
             "group": "build"
         },
         {
             "type": "shell",
             "dependsOn": ["bootstrap"],
-            "command": "openocd -f ./openocd.cfg -c “program ./build/picopico/Debug/out/picopico.elf verify reset exit”",
-            "label": "picopico program",
+            "command": "openocd -f ./openocd.cfg -c “program ./build/picopico/Debug/out/picopico.elf verify reset exit”", // fix
+            "label": "Program RP2040",
         },
         {
             "type": "shell",
             "dependsOn": ["bootstrap"],
-            "command": "openocd -f interface/cmsis-dap.cfg -f target/rp2040.cfg -f ./openocd.cfg -c “init ; reset halt ; rp2040.core1 arp_reset assert 0 ; rp2040.core0 arp_reset assert 0 ; exit”",
-            "label": "picopico reset",
+            "command": "openocd -f ./openocd.cfg -c “init ; reset halt ; rp2040.core1 arp_reset assert 0 ; rp2040.core0 arp_reset assert 0 ; exit”",
+            "label": "Reset RP2040",
         }
     ]
 }

@@ -73,3 +73,7 @@ their standardised [Debug connector spec](https://datasheets.raspberrypi.com/deb
    See the License for the specific language governing permissions and
    limitations under the License.
 ```
+
+# TODO
+
+- CI Pipeline for OpenOCD builds to replace microsoft/openocd.

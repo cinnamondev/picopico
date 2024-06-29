@@ -16,6 +16,8 @@ if ($ResetSDKLocation) {
   $env:PICO_SDK_PATH = ""
 }
 
+$oldPath = $env:PICO_SDK_PATH
+
 if ($PICO_SDK_PATH) {
   $prevPath = $env:PICO_SDK_PATH
   $env:PICO_SDK_PATH = Resolve-Path $PICO_SDK_PATH
@@ -58,14 +60,18 @@ Clone in current directory (1, default) or parent directory (2)?
       git submodule update
       $env:PICO_SDK_PATH = "$(Resolve-Path ./)"
       cd $cwd
-      $userInput = Read-Host @"
+  }
+}
+
+
+if (-not $oldPath) {
+    $userInput = Read-Host @"
 Would you like to SET the PICO_SDK_PATH env-var to this new installation?
 (Y/n)
 "@
-      if ("${userInput}" -eq "n") { exit }
+    if ("${userInput}" -eq "n") { exit }
       [Environment]::SetEnvironmentVariable("PICO_SDK_PATH", $env:PICO_SDK_PATH, "User")
     }
-  }
 }
 
 Write-Host "Using pico-sdk : ${env:PICO_SDK_PATH}"

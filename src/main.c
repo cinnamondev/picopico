@@ -19,17 +19,9 @@
 
 /* INCLUDES *******************************************************************/
 
-#include "boards/pico.h"
-#include "display/ili9341.h"
 #include <stdio.h>
-#include "hardware/gpio.h"
-#include "lv_demo_widgets.h"
-#include "perf_counter.h"
 #include "pico/stdio.h"
-#include "demos/lv_demos.h"
-#include "src/hal/lv_hal_disp.h"
-#include "tpcal/tpcal.h"
-#include "pico/time.h"
+#include "perf_counter.h"
 
 /* DEFINES ********************************************************************/
 
@@ -50,44 +42,12 @@ void SysTick_Handler(void)
 
 }
 
-/**
- * @brief 
- * 
- */
-void lv_hello_lvgl(void)
-{
-    // Create simple label centered on screen
-    lv_obj_t *label = lv_label_create(lv_scr_act());
-    lv_label_set_text(label, LV_SYMBOL_OK "hello lvgl!");
-    lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
-}
+
 
 int main() {
-    system_init();
-#ifdef DEBUG 
+    system_init(); 
     printf("hello world!");
-#endif
-    lv_init();
-    bus_init();
-    /*
     while(1) {
-        //xpt2046_touch();
-        uint16_t x,y;
-        if (xpt2046_touch()) xpt2046_xyz(&x,&y);
-        sleep_ms(10);
-    }
-
-    return 0;
-    */
-    struct drv_module_t drv = lv_disp_init();
-    ili9341_cmd_p(ILI9341_W_BRIGHT, 255);
-    lv_disp_drv_register(drv.display);
-    tpcal_register(drv.touch);
-    tpcal_calib(lv_demo_widgets);
-    //lv_hello_lvgl();
-    //lv_demo_widgets();
-    while(1) {
-        lv_timer_handler();
     }
 
     return 0;
