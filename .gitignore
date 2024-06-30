@@ -31,6 +31,10 @@
 *.out
 *.app
 
+# cmsis-toolbox
+*.cbuild*.yml
+*.cprj
+
 RTE/
 build/
 .clangd
