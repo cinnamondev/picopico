@@ -15,20 +15,13 @@
 #>
 
 param (
-    [string[]]
-    $link_libs = "",
     [string]
     $BuildTarget = "Debug",
     [string]
-    $TargetProject = "",
-    [switch]
-    $target_usb
-
+    $TargetProject = ""
 )
 
-# bootstrap vcpkg & activate build environment
-Invoke-Expression (Invoke-WebRequest -useb https://aka.ms/vcpkg-init.ps1)
-vcpkg activate
+./bootstrap.ps1
 
 # Find solution file
 $SOLUTION = @(Get-ChildItem -Filter "*.csolution.yaml")[0] # TODO: detect many csolutions?
@@ -87,7 +80,7 @@ if (!((Test-Path $OUTPUTDIR) -and (Test-Path $TEMPDIR))) {
 # Get missing packages
 foreach($l in (csolution -s $SOLUTION list packs -m)) {
     Write-Host "[BUILDGEN] Installing CMSIS-Pack: "$l
-    cpackget pack add $l
+    cpackget add $("${l}".Split("@")[0])
 }
 # Create *.CPRJ targets
 csolution convert -s $SOLUTION -o $TEMPDIR
@@ -97,36 +90,28 @@ cbuildgen cmake "${TEMPDIR}/${Project_Name}.${BuildTarget}+${Type}.cprj" --intdi
 # Build with CMake + Ninja
 Set-Location $OUTPUTDIR
 
-$env:PICO_SDK_PATH = "${_T}/pico-sdk"       # set pico sdk path
-
 
 (Get-Content "CMakeLists.txt") | 
     Foreach-Object {
         $_
         if ($_ -match 'cmake_minimum_required\(.+\)') {
             # Insert SDK after version
-            Write-Output "
-include(${_T}/pico_sdk_import.cmake)".Replace('\','/')
+            Write-Output "include(${_T}/pico_sdk_import.cmake)"
+                            .Replace('\','/')
         }
         if ($_ -match 'project\(.+\)') {
             # Load SDK after project (+ additional languages for SDK)
-            Write-Output "project(`${TARGET} CXX ASM)
-pico_sdk_init()"
+            Write-Output @"
+project(`${TARGET} CXX ASM)
+pico_sdk_init()
+"@
         }
     } | Set-Content "CMakeLists.txt"
 
-# stdio should redirect to UART by default for use by debugger probe.
-# Setting parameter -target_usb will redirect stdio to usb instead.
-$stdio_usb = If ($target_usb.IsPresent) {1} else {0}
-$stdio_uart = $stdio_usb -bxor 1 
 
-$append = "#Pico SDK Configuration
-pico_enable_stdio_usb(`${TARGET} ${stdio_usb})
-pico_enable_stdio_uart(`${TARGET} ${stdio_uart}) 
-target_link_libraries(`${TARGET} pico_stdlib ${link_libs})
-pico_add_extra_outputs(`${TARGET})
-".Replace('\','/')
-Add-Content "CMakeLists.txt" $append 
+# Include SDK options ( include() via cmake confuses it :( )
+Get-Content "${_T}/sdk_build_opts.cmake" | Add-Content "CMakeLists.txt"
+
 
 cmake -GNinja -B . 
 ninja 
