@@ -9,7 +9,8 @@ solution:
         - --specs=nano.specs
         - --specs=rdimon.specs
   projects:
-    - project: ./picopico.cproject.yaml
+    - project: ./lvgl/lvgl.cproject.yaml
+    - project: ./blinky/blinky.cproject.yaml
   target-types:
     - type: Device
       device: ARM::ARMCM0P  # board cannot be specified. RP2xxx_DFP only has AC6 support :). Oh well!
