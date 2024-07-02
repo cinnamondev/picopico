@@ -213,6 +213,7 @@ $OUTPUTDIR = "${_T}/out/${ProjectName}/${TargetType}/${BuildType}/"
 # ensure build directories exist
 if (-not (Test-Path $OUTPUTDIR)) {
     New-Item -Path $OUTPUTDIR -ItemType Directory
+    New-Item -Path $BUILDDIR -ItemType Directory
 }
 
 # Get missing packages
