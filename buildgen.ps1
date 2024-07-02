@@ -1,5 +1,6 @@
 # buildgen.ps1
-<# Copyright 2023 Cinnamondev
+# Tested on Powershell 7.4.2 Linux, 
+<# Copyright 2024 Cinnamondev
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -16,66 +17,200 @@
 
 param (
     [string]
-    $BuildTarget = "Debug",
+    $csolution = "",
+    [switch]
+    $IgnoreEnvironment,
     [string]
-    $TargetProject = ""
+    $TargetProject = "",
+    [string]
+    $BuildType = "Debug",
+    [string]
+    $TargetType = "",
+    [switch]
+    $Help
 )
+
+$err
+try {
+    Import-Module powershell-yaml
+} 
+catch {
+    Write-Host "Module powershell-yaml is required to parse csolution/cproject(s). Installing to User scope..."
+    Install-Module powershell-yaml -Scope CurrentUser
+}
+
+
+if ($Help) {
+    Write-Host @"
+buildgen.ps1 <path to csolution> [args]
+args:
+    -csolution <path to csolution>  (not required if only 1 csolution present in cwd)
+    -BuildTarget <Debug/Release> (default=Debug)
+    -TargetProject <name of project> (Required)
+    -IgnoreEnvironment (ignore incorrect CWD errors)
+    -Help (opens this menu)
+"@
+    exit
+}
 
 ./bootstrap.ps1
 
 # Find solution file
-$SOLUTION = @(Get-ChildItem -Filter "*.csolution.yaml")[0] # TODO: detect many csolutions?
-if(!$SOLUTION) {$SOLUTION = @(Get-ChildItem -Filter "*.csolution.yml")[0]}
-
-# All projects matching name in csolution
-$int_ttypes = $false
-$Type = "Device" # use project default as a fallback
-$_Projects = # Support for file path as target project (vscode cmsis integ.)
-if($TargetProject -match "((.*[\\\/])(.+).cproject.yaml)") {
-    [System.Tuple]::Create($Matches.3,$Matches.2,$Matches.1)
+$SOLUTIONS = @(Get-ChildItem -Filter "*.csolution.y*ml" | select -expand FullName) # TODO: detect many csolutions?
+$SOLUTION = ""
+if ($SOLUTIONS.Length -eq 1) {
+    # we only need to double check there wasnt a csolution explicitly provided.
+    $SOLUTION = @($SOLUTIONS)[0]
+    if (($SOLUTION -ne $csolution) -and $csolution) { # cannot find explicit csolution.
+        Write-Error "Cannot find supplied csolution (one found in CWD, but it did not match supplied string)"
+        exit
+    }
 } else {
-    (Get-Content $SOLUTION) | ForEach-Object {
-        if ($_ -match "- project: ((.*[\\\/])(.+).cproject.yaml)") {
-            if($Matches.3 -eq $TargetProject) {
-                [System.Tuple]::Create($Matches.3,$Matches.2,$Matches.1)
+    if (-not $csolution) {
+        Write-Error "Multiple csolutions available. Please specify which one."
+        exit
+    } else {
+        if ($csolution -Match ".+\.csolution.y[a]*ml") {
+            $SOLUTION = Resolve-Path $csolution -ErrorVariable err -ErrorAction SilentlyContinue
+        } else {
+            # extension not provided, test which extension to use. Al
+            if ((Test-Path "${csolution}.csolution.yaml") -eq $true) {
+                $SOLUTION = "$(Resolve-Path "${csolution}.csolution.yaml")"
+            } elseif ((Test-Path "${csolution}.csolution.yml") -eq $true) {
+                $SOLUTION = "$(Resolve-Path "${csolution}.csolution.yml")"
+            } else { # no instances of *.csolution.y(a)ml
+                Write-Error "Could not find csolution."
+                exit 
             }
         }
-        if ($_ -match "target-types:") {$int_ttypes = $true}
-        if ($_ -match "- type: (.+)" -and $int_ttypes) {
-            $int_ttypes = $false
-            $Type =  $Matches.1
+        if ($err) {
+                Write-Host $err
+                exit
+            }
+        if ((-not ($SOLUTIONS -contains $SOLUTION)) -and ($SOLUTION -ne "") -and (-not $IgnoreEnvironment)) {
+            # SOLUTION resolved, not found in CWD. Override with -IgnoreEnvironment
+            Write-Error "soft fault, csolution found but it is not in cwd. are you calling from a different env?? (use switch -IgnoreEnvironment to ignore)"
+            exit
         }
     }
 }
+Write-Host "Using CSOLUTION: ${SOLUTION}"
 
-if ($_Projects.Count -ne 1) {
-    if($_Projects.Count -eq 0) {Write-Error "Could not find the target project in the csolution."} 
-    else {Write-Error "You have duplicate projects of the same name in your csolution."}
+# Discover projects, targets, types.
+
+$yaml_csolution = $(Get-Content $SOLUTION | ConvertFrom-yaml).solution
+$AvailableProjects = @{} # project hashtable
+$TargetTypeList = @() # Target types array
+$BuildTypeList = @() # Build types array
+
+foreach($project in $yaml_csolution.projects) {
+    $($project.GetEnumerator()).Value -match "(.*[\\\/](.+).cproject.y[a]*ml)" | Out-Null
+    $AvailableProjects["$(($Matches.2 | Out-String).Trim())"] = $Matches.1
+}
+
+foreach($target in $yaml_csolution["target-types"]) {
+    $target.type | ForEach-Object {
+        $TargetTypeList += $_.Trim()
+    }
+}
+
+foreach($builds in $yaml_csolution["build-types"]) {
+    $builds.type | ForEach-Object {
+        $BuildTypeList += $_.Trim()
+    }
+}
+
+# Check if we have anything missing...
+
+if  ($AvailableProjects.Length -eq 0) { # csolution is missing projects?
+    Write-Error "Could not find any projects in csolution :("
+    exit
+} else {
+    Write-Host @"
+Found Projects:
+$($AvailableProjects.Keys | Out-String)
+"@
+}
+
+if  ($TargetTypeList.Length -eq 0) { # csolution is missing targets?
+    Write-Error "There are no targets?"
+    exit
+} else {
+    Write-Host @"
+Found Targets:
+$($TargetTypeList | Out-String)
+"@
+}
+
+if  ($BuildTypeList.Length -eq 0) { # csolution is missing builds?
+    Write-Error "There are no build types?"
+    exit
+} else {
+    Write-Host @"
+Found Build Types:
+$($BuildTypeList | Out-String)
+"@
+}
+
+# Project Inference & parameter checking
+
+if (-not $TargetProject) {
+    # targetproject not specified
+    if ($AvailableProjects -eq 1) {
+        # No target project provided
+        $TargetProject = $AvailableProjects[0]
+        Write-Host "(warning) inferring project via only singular available..."
+    } else {
+        Write-Error "Multiple projects present, but none specified (Specify with -TargetProject <project name>)."
+        exit
+    }
+}
+
+if (-not $AvailableProjects.ContainsKey($TargetProject.Trim())) { 
+    Write-Error "Cannot find target project! (See list of available projects, and/or check your csolution)"
     exit
 }
 
-#$Project = $_Projects[0]
-$Project_Name = $_Projects.Item1
-$Project_Path = $_Projects.Item2
-$Project_Full_Path = $_Projects.Item3
+# target inference & parameter checking
+
+if ((-not $TargetType) -and ($TargetTypeList.Length -eq 1)) {
+    $TargetType = $TargetTypeList[0]
+    Write-Host "inferring target type by only available..."
+}
+
+if (-not $TargetTypeList -contains $TargetType) { 
+    Write-Error "Cannot find target type! (See list of available target types, and/or check your csolution) (specify using -TargetType <device>)"
+    exit
+}
+
+# build inference & parameter checking
+
+if ((-not $BuildType) -and ($BuildTypeList.Length -eq 1)) {
+    $BuildType = $BuildTypeList[0]
+    Write-Host "inferring build type by only available..."
+}
+
+if (-not $BuildTypeList -contains $BuildType) { 
+    Write-Error "Cannot find build type! (See list of available build types, and/or check your csolution) (specify using -BuildType <build type>)"
+    exit
+}
+
+$ProjectName = $TargetProject.Trim()
+$Project_Full_Path = $AvailableProjects[$ProjectName]
 
 $_T = Get-Location
-$BUILDDIR = "${_T}/build"
-$TEMPDIR = "${_T}/build/.tmp"
-$PROJECTDIR ="${_T}/build/${Project_Name}"
-$TARGETDIR = "${_T}/build/${Project_Name}/${BuildTarget}"
-$OUTPUTDIR = "${_T}/build/${Project_Name}/${BuildTarget}/out"
+$BUILDROOT = "${_T}/build"
+$TEMPDIR = "${_T}/build/"
+$PROJECTDIR ="${_T}/build/${ProjectName}"
+$TARGETDIR = "${_T}/build/${ProjectName}/${TargetType}"
+$BUILDDIR = "${_T}/build/${ProjectName}/${TargetType}/${BuildType}"
+$OUTPUTDIR = "${_T}/build/${ProjectName}/${TargetType}/${BuildType}/out"
 
 
 # ensure build directories exist
-if (!((Test-Path $OUTPUTDIR) -and (Test-Path $TEMPDIR))) {
-    New-Item -Path $BUILDDIR -ItemType Directory
-    New-Item -Path $TEMPDIR -ItemType Directory
-    New-Item -Path $PROJECTDIR -ItemType Directory
-    New-Item -Path $TARGETDIR -ItemType Directory
+if (-not (Test-Path $OUTPUTDIR)) {
     New-Item -Path $OUTPUTDIR -ItemType Directory
 }
-
 
 # Get missing packages
 foreach($l in (csolution -s $SOLUTION list packs -m)) {
@@ -85,10 +220,10 @@ foreach($l in (csolution -s $SOLUTION list packs -m)) {
 # Create *.CPRJ targets
 csolution convert -s $SOLUTION -o $TEMPDIR
 # Create CMakeList for target project
-cbuildgen cmake "${TEMPDIR}/${Project_Name}.${BuildTarget}+${Type}.cprj" --intdir $OUTPUTDIR --outdir $OUTPUTDIR
+cbuildgen cmake "${BUILDROOT}/${ProjectName}.${BuildType}+${TargetType}.cprj" --intdir $BUILDDIR --outdir $OUTPUTDIR
 
 # Build with CMake + Ninja
-Set-Location $OUTPUTDIR
+Set-Location $BUILDDIR
 
 
 (Get-Content "CMakeLists.txt") | 
@@ -108,9 +243,14 @@ pico_sdk_init()
         }
     } | Set-Content "CMakeLists.txt"
 
+$SDK_OPTS_PATH = "${_T}/sdk_options.cmake" 
+# Check if a sdk_options.BUILD+TARGET.cmake exists
+if (Test-Path "${_T}/sdk_options.${BuildType}+${TargetType}.cmake") {
+    $SDK_OPTS_PATH = "${_T}/sdk_options.${BuildType}+${TargetType}.cmake"
+}
 
 # Include SDK options ( include() via cmake confuses it :( )
-Get-Content "${_T}/sdk_build_opts.cmake" | Add-Content "CMakeLists.txt"
+Get-Content "${_T}/sdk_options.cmake" | Add-Content "CMakeLists.txt"
 
 
 cmake -GNinja -B . 
