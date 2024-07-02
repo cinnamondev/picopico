@@ -27,6 +27,8 @@ param (
     [string]
     $TargetType = "",
     [switch]
+    $Program,
+    [switch]
     $Help
 )
 
@@ -56,7 +58,7 @@ args:
 ./bootstrap.ps1
 
 # Find solution file
-$SOLUTIONS = @(Get-ChildItem -Filter "*.csolution.y*ml" | select -expand FullName) # TODO: detect many csolutions?
+$SOLUTIONS = @(Get-ChildItem -Filter "*.csolution.y*ml" | select -expand FullName)
 $SOLUTION = ""
 if ($SOLUTIONS.Length -eq 1) {
     # we only need to double check there wasnt a csolution explicitly provided.
@@ -195,6 +197,7 @@ if (-not $BuildTypeList -contains $BuildType) {
     exit
 }
 
+# TODO: wrap to build multiple projects, targets, etc. i.e -TargetProject * -BuildType Release -TargetType * for all projects and targets as Release.
 $ProjectName = $TargetProject.Trim()
 $Project_Full_Path = $AvailableProjects[$ProjectName]
 
@@ -204,7 +207,7 @@ $TEMPDIR = "${_T}/build/"
 $PROJECTDIR ="${_T}/build/${ProjectName}"
 $TARGETDIR = "${_T}/build/${ProjectName}/${TargetType}"
 $BUILDDIR = "${_T}/build/${ProjectName}/${TargetType}/${BuildType}"
-$OUTPUTDIR = "${_T}/build/${ProjectName}/${TargetType}/${BuildType}/out"
+$OUTPUTDIR = "${_T}/out/${ProjectName}/${TargetType}/${BuildType}/"
 
 
 # ensure build directories exist
@@ -231,8 +234,7 @@ Set-Location $BUILDDIR
         $_
         if ($_ -match 'cmake_minimum_required\(.+\)') {
             # Insert SDK after version
-            Write-Output "include(${_T}/pico_sdk_import.cmake)"
-                            .Replace('\','/')
+            Write-Output "include(${_T}/pico_sdk_import.cmake)".Replace('\','/')
         }
         if ($_ -match 'project\(.+\)') {
             # Load SDK after project (+ additional languages for SDK)
@@ -252,7 +254,11 @@ if (Test-Path "${_T}/sdk_options.${BuildType}+${TargetType}.cmake") {
 # Include SDK options ( include() via cmake confuses it :( )
 Get-Content "${_T}/sdk_options.cmake" | Add-Content "CMakeLists.txt"
 
-
 cmake -GNinja -B . 
 ninja 
+
+if ($Program) {
+    openocd -f ${_T}/openocd.cfg -c "program ${_T}/out/${ProjectName}/${TargetType}/${BuildType}/${ProjectName}.elf verify reset exit"
+}
+
 Set-Location $_T
