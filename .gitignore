@@ -31,7 +31,12 @@
 *.out
 *.app
 
-RTE/
+# cmsis-toolbox
+*.cbuild*.yml
+*.cprj
+tmp/
 build/
+out/
+RTE/
 .clangd
-.vscode/settings.json
+.vscode/
